@@ -38,5 +38,5 @@ sudo ./http-server.sh start
 
 ## Ссылки
 
-- Исходный репозиторий: github.com/itefixnet/prometheus-wireguard-exporter
-- AmneziaVPN: amnezia.org
+- Исходный репозиторий: [itefixnet/prometheus-wireguard-exporter](https://github.com/itefixnet/prometheus-wireguard-exporter)
+- [AmneziaVPN](https://github.com/amnezia-vpn)
