@@ -1,6 +1,6 @@
 [Unit]
-Description=WireGuard Prometheus Exporter
-Documentation=https://github.com/itefixnet/prometheus-wireguard-exporter
+Description=Amnezia Prometheus Exporter
+Documentation=https://github.com/fixfever/prometheus-amnezia-exporter
 After=network.target wg-quick.target
 
 [Service]

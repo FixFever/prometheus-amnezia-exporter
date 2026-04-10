@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# WireGuard Prometheus Exporter HTTP Server
+# AmneziaVPN Prometheus Exporter HTTP Server
 # Uses socat to serve Prometheus metrics via HTTP
 #
 
@@ -26,7 +26,7 @@ log() {
 
 # Function to start the HTTP server
 start_server() {
-    log "Starting WireGuard Prometheus Exporter HTTP Server"
+    log "Starting AmneziaVPN Prometheus Exporter HTTP Server"
     log "Listening on ${LISTEN_ADDRESS}:${LISTEN_PORT}"
     log "Exporter script: $EXPORTER_SCRIPT"
     log "Max connections: $MAX_CONNECTIONS"
@@ -78,7 +78,7 @@ case "$path" in
         fi
         ;;
     "/")
-        html="<!DOCTYPE html><html><head><title>WireGuard Exporter</title></head><body><h1>WireGuard Prometheus Exporter</h1><p><a href=\"/metrics\">Metrics</a> | <a href=\"/health\">Health</a></p><h2>Configuration</h2><pre>$(EXPORTER_SCRIPT help 2>/dev/null || echo "Help not available")</pre></body></html>"
+        html="<!DOCTYPE html><html><head><title>AmneziaVPN Exporter</title></head><body><h1>AmneziaVPN Prometheus Exporter</h1><p><a href=\"/metrics\">Metrics</a> | <a href=\"/health\">Health</a></p><h2>Configuration</h2><pre>$(EXPORTER_SCRIPT help 2>/dev/null || echo "Help not available")</pre></body></html>"
         printf "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: %d\r\n\r\n%s" "$(printf "%s" "$html" | wc -c)" "$html"
         ;;
     *)
@@ -102,7 +102,7 @@ EOF
 
 # Function to stop the server (for systemd)
 stop_server() {
-    log "Stopping WireGuard Prometheus Exporter HTTP Server"
+    log "Stopping AmneziaVPN Prometheus Exporter HTTP Server"
     # Kill any socat processes listening on our port
     pkill -f "socat.*TCP-LISTEN:${LISTEN_PORT}" || true
 }
@@ -136,7 +136,7 @@ case "${1:-start}" in
         log "Configuration test successful"
         ;;
     "version")
-        echo "WireGuard Exporter HTTP Server v1.0.0"
+        echo "AmneziaVPN Exporter HTTP Server v1.0.0"
         ;;
     "help"|"-h"|"--help")
         echo "Usage: $0 [start|stop|restart|test|version|help]"

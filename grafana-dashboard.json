@@ -358,7 +358,7 @@
           },
           "editorMode": "code",
           "expr": "irate(wireguard_peer_receive_bytes_total{instance=~\"$instance\", interface=~\"$interface\"}[5m])",
-          "legendFormat": "{{public_key}}",
+          "legendFormat": "{{client_name}}",
           "range": true,
           "refId": "A"
         }
@@ -451,7 +451,7 @@
           },
           "editorMode": "code",
           "expr": "irate(wireguard_peer_transmit_bytes_total{instance=~\"$instance\", interface=~\"$interface\"}[5m])",
-          "legendFormat": "{{public_key}}",
+          "legendFormat": "{{client_name}}",
           "range": true,
           "refId": "A"
         }
@@ -543,7 +543,7 @@
           },
           "editorMode": "code",
           "expr": "wireguard_peer_receive_bytes_total{instance=~\"$instance\", interface=~\"$interface\"}",
-          "legendFormat": "{{public_key}}",
+          "legendFormat": "{{client_name}}",
           "range": true,
           "refId": "A"
         }
@@ -635,7 +635,7 @@
           },
           "editorMode": "code",
           "expr": "wireguard_peer_transmit_bytes_total{instance=~\"$instance\", interface=~\"$interface\"}",
-          "legendFormat": "{{public_key}}",
+          "legendFormat": "{{client_name}}",
           "range": true,
           "refId": "A"
         }
@@ -863,7 +863,7 @@
                 "aggregations": [],
                 "operation": "groupby"
               },
-              "public_key": {
+              "client_name": {
                 "aggregations": [],
                 "operation": "groupby"
               },
@@ -891,7 +891,7 @@
               "Value #C (lastNotNull)": "Transmitted",
               "endpoint": "Endpoint",
               "interface": "Interface",
-              "public_key": "Public Key",
+              "client_name": "Client name",
               "server_name": "Server"
             }
           }
@@ -990,8 +990,8 @@
   },
   "timepicker": {},
   "timezone": "",
-  "title": "WireGuard Exporter",
-  "uid": "wireguard-exporter",
+  "title": "AmneziaVPN Exporter",
+  "uid": "amnezia-exporter",
   "version": 1,
   "weekStart": ""
 }

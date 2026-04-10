@@ -1,12 +1,13 @@
 #!/bin/bash
 #
-# WireGuard Prometheus Exporter Configuration
+# AmneziaVPN Prometheus Exporter Configuration
 # Source this file to configure the exporter settings
 #
 
 # WireGuard Configuration
 export WIREGUARD_INTERFACE="${WIREGUARD_INTERFACE:-}"  # Leave empty to monitor all interfaces
-export WIREGUARD_DOCKER_CONTAINER="${WIREGUARD_DOCKER_CONTAINER:-}"  # Docker container name (if WireGuard runs in container)
+export WIREGUARD_DOCKER_CONTAINER="${WIREGUARD_DOCKER_CONTAINER:amnezia-awg}" # AmneziaVPN docker container name
+export CLIENTS_TABLE_FILE="${CLIENTS_TABLE_FILE:/opt/amnezia/awg/clientsTable}" # Path to AmneziaVPN client table
 
 # Prometheus Exporter Configuration
 export METRICS_PREFIX="${METRICS_PREFIX:-wireguard}"

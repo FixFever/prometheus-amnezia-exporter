@@ -1,7 +1,8 @@
 #!/bin/bash
 #
-# WireGuard Prometheus Exporter
+# AmneziaVPN Prometheus Exporter
 # A bash-based exporter for WireGuard VPN statistics
+# With client name support from JSON config
 #
 
 # Set strict error handling
@@ -14,8 +15,9 @@ CONFIG_FILE="${SCRIPT_DIR}/config.sh"
 
 # Default configuration
 WIREGUARD_INTERFACE="${WIREGUARD_INTERFACE:-}"
-WIREGUARD_DOCKER_CONTAINER="${WIREGUARD_DOCKER_CONTAINER:-}"  # Docker container name (if WireGuard runs in container)
+WIREGUARD_DOCKER_CONTAINER="${WIREGUARD_DOCKER_CONTAINER:-}" # AmneziaVPN docker container name
 METRICS_PREFIX="${METRICS_PREFIX:-wireguard}"
+CLIENTS_TABLE_FILE="${CLIENTS_TABLE_FILE:-}"  # Path to clients table JSON file
 
 # Logging function
 log() {
@@ -37,6 +39,92 @@ ip_exec() {
         docker exec "$WIREGUARD_DOCKER_CONTAINER" ip "$@" 2>/dev/null
     else
         ip "$@" 2>/dev/null
+    fi
+}
+
+# Helper function to read file from Docker container or local filesystem
+read_file_from_container() {
+    local file_path="$1"
+    
+    if [[ -z "$file_path" ]]; then
+        return 1
+    fi
+    
+    if [[ -n "$WIREGUARD_DOCKER_CONTAINER" ]]; then
+        docker exec "$WIREGUARD_DOCKER_CONTAINER" cat "$file_path" 2>/dev/null
+    else
+        cat "$file_path" 2>/dev/null
+    fi
+}
+
+# Declare associative array for client names
+declare -A CLIENT_NAMES
+
+# Function to load client names from JSON file
+load_client_names() {
+    # Clear existing mappings
+    CLIENT_NAMES=()
+    
+    if [[ -z "$CLIENTS_TABLE_FILE" ]]; then
+        return 0
+    fi
+    
+    local json_content
+    json_content=$(read_file_from_container "$CLIENTS_TABLE_FILE")
+    
+    if [[ -z "$json_content" ]]; then
+        log "WARNING: Clients table file not found or empty: $CLIENTS_TABLE_FILE"
+        return 0
+    fi
+    
+    # Parse JSON using python (more reliable than bash-only for complex JSON)
+    # Fallback to jq if available, otherwise use python
+    local parsed_data=""
+    
+    if command -v jq &>/dev/null; then
+        parsed_data=$(echo "$json_content" | jq -r '.[] | "\(.clientId)|\(.userData.clientName // "")"' 2>/dev/null)
+    elif command -v python3 &>/dev/null; then
+        parsed_data=$(echo "$json_content" | python3 -c "
+import sys, json
+try:
+    data = json.load(sys.stdin)
+    for item in data:
+        client_id = item.get('clientId', '')
+        client_name = item.get('userData', {}).get('clientName', '')
+        if client_id and client_name:
+            print(f'{client_id}|{client_name}')
+except:
+    pass
+" 2>/dev/null)
+    else
+        log "WARNING: Neither jq nor python3 available. Cannot parse JSON clients table"
+        return 0
+    fi
+    
+    if [[ -z "$parsed_data" ]]; then
+        log "WARNING: No client mappings found in $CLIENTS_TABLE_FILE"
+        return 0
+    fi
+    
+    # Populate the associative array
+    while IFS='|' read -r client_id client_name; do
+        if [[ -n "$client_id" && -n "$client_name" ]]; then
+            CLIENT_NAMES["$client_id"]="$client_name"
+        fi
+    done <<< "$parsed_data"
+    
+    log "Loaded ${#CLIENT_NAMES[@]} client mappings from $CLIENTS_TABLE_FILE"
+}
+
+# Function to get client name by public key
+get_client_name() {
+    local public_key="$1"
+    
+    if [[ -n "${CLIENT_NAMES[$public_key]:-}" ]]; then
+        echo "${CLIENT_NAMES[$public_key]}"
+    else
+        # Return empty string if no mapping found
+        echo ""
     fi
 }
 
@@ -139,8 +227,27 @@ collect_peer_metrics() {
         transfer_tx=$(echo "$peer_info" | awk '{print $7}')
         persistent_keepalive=$(echo "$peer_info" | awk '{print $8}')
         
+        # Get client name from mapping
+        local client_name
+        client_name=$(get_client_name "$peer_pubkey")
+        
         # Use short version of public key for labels (first 8 chars)
         local peer_short="${peer_pubkey:0:8}"
+        
+        # Escape double quotes and backslashes in client name for Prometheus
+        local safe_client_name=""
+        if [[ -n "$client_name" ]]; then
+            safe_client_name=$(echo "$client_name" | sed 's/\\/\\\\/g; s/"/\\"/g')
+        fi
+        
+        # Build labels string
+        local base_labels="interface=\"${interface}\",public_key=\"${peer_short}\""
+        if [[ -n "$safe_client_name" ]]; then
+            base_labels="${base_labels},client_name=\"${safe_client_name}\""
+        fi
+        if [[ -n "$endpoint" && "$endpoint" != "(none)" ]]; then
+            base_labels="${base_labels},endpoint=\"${endpoint}\""
+        fi
         
         # Peer connected status (handshake within last 3 minutes = 180 seconds)
         local current_time
@@ -148,31 +255,31 @@ collect_peer_metrics() {
         local time_since_handshake=$((current_time - latest_handshake))
         
         if [[ "$latest_handshake" != "0" ]] && [[ $time_since_handshake -lt 180 ]]; then
-            format_metric "peer_connected" "1" "interface=\"${interface}\",public_key=\"${peer_short}\",endpoint=\"${endpoint}\"" "Peer connection status (1=connected, 0=disconnected)"
+            format_metric "peer_connected" "1" "$base_labels" "Peer connection status (1=connected, 0=disconnected)"
         else
-            format_metric "peer_connected" "0" "interface=\"${interface}\",public_key=\"${peer_short}\",endpoint=\"${endpoint}\"" "Peer connection status (1=connected, 0=disconnected)"
+            format_metric "peer_connected" "0" "$base_labels" "Peer connection status (1=connected, 0=disconnected)"
         fi
         
         # Latest handshake timestamp
-        format_metric "peer_latest_handshake_seconds" "$latest_handshake" "interface=\"${interface}\",public_key=\"${peer_short}\",endpoint=\"${endpoint}\"" "UNIX timestamp of the last handshake" "gauge"
+        format_metric "peer_latest_handshake_seconds" "$latest_handshake" "$base_labels" "UNIX timestamp of the last handshake" "gauge"
         
         # Bytes received
-        format_metric "peer_receive_bytes_total" "$transfer_rx" "interface=\"${interface}\",public_key=\"${peer_short}\",endpoint=\"${endpoint}\"" "Total bytes received from peer" "counter"
+        format_metric "peer_receive_bytes_total" "$transfer_rx" "$base_labels" "Total bytes received from peer" "counter"
         
         # Bytes transmitted
-        format_metric "peer_transmit_bytes_total" "$transfer_tx" "interface=\"${interface}\",public_key=\"${peer_short}\",endpoint=\"${endpoint}\"" "Total bytes transmitted to peer" "counter"
+        format_metric "peer_transmit_bytes_total" "$transfer_tx" "$base_labels" "Total bytes transmitted to peer" "counter"
         
         # Persistent keepalive interval
         if [[ "$persistent_keepalive" != "off" ]] && [[ "$persistent_keepalive" != "0" ]]; then
-            format_metric "peer_persistent_keepalive_interval" "$persistent_keepalive" "interface=\"${interface}\",public_key=\"${peer_short}\",endpoint=\"${endpoint}\"" "Persistent keepalive interval in seconds"
+            format_metric "peer_persistent_keepalive_interval" "$persistent_keepalive" "$base_labels" "Persistent keepalive interval in seconds"
         else
-            format_metric "peer_persistent_keepalive_interval" "0" "interface=\"${interface}\",public_key=\"${peer_short}\",endpoint=\"${endpoint}\"" "Persistent keepalive interval in seconds"
+            format_metric "peer_persistent_keepalive_interval" "0" "$base_labels" "Persistent keepalive interval in seconds"
         fi
         
         # Number of allowed IPs
         local allowed_ips_count
         allowed_ips_count=$(echo "$allowed_ips" | tr ',' '\n' | wc -l)
-        format_metric "peer_allowed_ips_count" "$allowed_ips_count" "interface=\"${interface}\",public_key=\"${peer_short}\",endpoint=\"${endpoint}\"" "Number of allowed IP ranges for peer"
+        format_metric "peer_allowed_ips_count" "$allowed_ips_count" "$base_labels" "Number of allowed IP ranges for peer"
         
     done <<< "$peers"
 }
@@ -194,8 +301,11 @@ get_version_info() {
 
 # Main function to collect and output all metrics
 collect_metrics() {
+    # Load client names from JSON file (reloads on every scrape)
+    load_client_names
+    
     # Output metrics header
-    echo "# WireGuard VPN Metrics"
+    echo "# AmneziaVPN Metrics"
     echo "# Generated at $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
     echo ""
     
@@ -301,6 +411,28 @@ test_connection() {
         fi
     fi
     
+    # Test client table loading
+    if [[ -n "$CLIENTS_TABLE_FILE" ]]; then
+        log "Testing clients table loading from: $CLIENTS_TABLE_FILE"
+        load_client_names
+        if [[ ${#CLIENT_NAMES[@]} -gt 0 ]]; then
+            log "SUCCESS: Loaded ${#CLIENT_NAMES[@]} client mappings"
+            # Show first few mappings
+            local count=0
+            for key in "${!CLIENT_NAMES[@]}"; do
+                if [[ $count -lt 5 ]]; then
+                    log "  ${key:0:16}... -> ${CLIENT_NAMES[$key]}"
+                    ((count++))
+                fi
+            done
+        else
+            log "WARNING: No client mappings loaded from $CLIENTS_TABLE_FILE"
+            errors=$((errors + 1))
+        fi
+    else
+        log "INFO: CLIENTS_TABLE_FILE not set - client name mapping disabled"
+    fi
+    
     # Check for interfaces
     local interfaces
     interfaces=$(get_interfaces)
@@ -341,7 +473,7 @@ case "${1:-collect}" in
         test_connection
         ;;
     "version")
-        echo "WireGuard Exporter v1.0.0"
+        echo "AmneziaVPN Exporter v1.0.0"
         ;;
     "help"|"-h"|"--help")
         echo "Usage: $0 [collect|test|version|help]"
@@ -356,6 +488,7 @@ case "${1:-collect}" in
         echo "  WIREGUARD_INTERFACE        - Specific interface to monitor (default: all interfaces)"
         echo "  WIREGUARD_DOCKER_CONTAINER - Docker container name running WireGuard (optional)"
         echo "  METRICS_PREFIX             - Metrics prefix (default: wireguard)"
+        echo "  CLIENTS_TABLE_FILE         - Path to JSON file with client names mapping (optional)"
         ;;
     *)
         log "ERROR: Unknown command: $1"
