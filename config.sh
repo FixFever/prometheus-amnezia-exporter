@@ -6,8 +6,8 @@
 
 # WireGuard Configuration
 export WIREGUARD_INTERFACE="${WIREGUARD_INTERFACE:-}"  # Leave empty to monitor all interfaces
-export WIREGUARD_DOCKER_CONTAINER="${WIREGUARD_DOCKER_CONTAINER:amnezia-awg}" # AmneziaVPN docker container name
-export CLIENTS_TABLE_FILE="${CLIENTS_TABLE_FILE:/opt/amnezia/awg/clientsTable}" # Path to AmneziaVPN client table
+export WIREGUARD_DOCKER_CONTAINER="${WIREGUARD_DOCKER_CONTAINER:-amnezia-awg}" # AmneziaVPN docker container name
+export CLIENTS_TABLE_FILE="${CLIENTS_TABLE_FILE:-/opt/amnezia/awg/clientsTable}" # Path to AmneziaVPN client table
 
 # Prometheus Exporter Configuration
 export METRICS_PREFIX="${METRICS_PREFIX:-wireguard}"

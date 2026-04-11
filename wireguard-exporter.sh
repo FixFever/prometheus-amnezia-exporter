@@ -15,9 +15,9 @@ CONFIG_FILE="${SCRIPT_DIR}/config.sh"
 
 # Default configuration
 WIREGUARD_INTERFACE="${WIREGUARD_INTERFACE:-}"
-WIREGUARD_DOCKER_CONTAINER="${WIREGUARD_DOCKER_CONTAINER:-}" # AmneziaVPN docker container name
+WIREGUARD_DOCKER_CONTAINER="${WIREGUARD_DOCKER_CONTAINER:-amnezia-awg}" # AmneziaVPN docker container name
 METRICS_PREFIX="${METRICS_PREFIX:-wireguard}"
-CLIENTS_TABLE_FILE="${CLIENTS_TABLE_FILE:-}"  # Path to clients table JSON file
+CLIENTS_TABLE_FILE="${CLIENTS_TABLE_FILE:-/opt/amnezia/awg/clientsTable}"  # Path to clients table JSON file
 
 # Logging function
 log() {
