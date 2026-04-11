@@ -9,18 +9,12 @@
 
 - Чтение `clientsTable` (JSON) из Docker-контейнера AmneziaVPN
 - Добавление лейбла `client_name` к метрикам peer'ов
+- Готовый образ для запуска экспортера в docker-контейнере
 - В примере дашборда Grafana изменено использование лейбла `public_key` на `client_name`
 
-## Конфигурация
-
-В `config.sh`:
-
-```bash
-export WIREGUARD_DOCKER_CONTAINER="amnezia-awg"
-export CLIENTS_TABLE_FILE="/opt/amnezia/awg/clientsTable"
-```
-
 ## Установка
+
+### Запуск на хосте
 
 ```bash
 # Клонируем репозиторий
@@ -34,7 +28,40 @@ chmod +x *.sh
 sudo ./http-server.sh start
 ```
 
+### Запуск через docker run
+
+```
+docker run -d \
+  --name amnezia-exporter \
+  --network host \
+  -v /var/run/docker.sock:/var/run/docker.sock:ro \
+  fixfever/prometheus-amnezia-exporter:latest
+```
+
+### Запуск через docker-compose
+
+```
+services:
+  prometheus-amnezia-exporter:
+    image: fixfever/prometheus-amnezia-exporter:latest
+    container_name: amnezia-exporter
+    ports:
+      - 9586:9586
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    restart: unless-stopped
+```
+
 Метрики доступны по адресу: http://localhost:9586/metrics
+
+## Переменные окружения
+
+| Переменная | По умолчанию | Описание |
+|------------|--------------|----------|
+| `WIREGUARD_DOCKER_CONTAINER` | `amnezia-awg` | Имя Docker-контейнера с AmneziaVPN |
+| `CLIENTS_TABLE_FILE` | `/opt/amnezia/awg/clientsTable` | Путь к JSON-файлу с именами клиентов (внутри контейнера) |
+| `LISTEN_PORT` | `9586` | Порт для HTTP-сервера |
+| `LISTEN_ADDRESS` | `0.0.0.0` | Адрес для привязки |
 
 ## Ссылки
 

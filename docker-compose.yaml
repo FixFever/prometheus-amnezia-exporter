@@ -1,0 +1,9 @@
+services:
+  prometheus-amnezia-exporter:
+    image: fixfever/prometheus-amnezia-exporter:latest
+    container_name: amnezia-exporter
+    ports:
+      - 9586:9586
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    restart: unless-stopped
